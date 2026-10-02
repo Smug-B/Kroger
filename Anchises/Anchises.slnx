@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="../../SmugSystems/SmugBase/SmugBase.csproj" />
+  <Project Path="Anchises.csproj" />
+</Solution>
