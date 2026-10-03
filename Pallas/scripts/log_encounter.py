@@ -2,7 +2,7 @@ import argparse
 import datetime
 import sqlite3
 
-from scripts.utils import ensure_working_directory, get_parent_id, get_database
+from utils import ensure_working_directory, get_parent_id, get_database
 
 
 def create_encounter_database(connection: sqlite3.Connection, cursor: sqlite3.Cursor) -> None:
@@ -56,9 +56,9 @@ def create_comments_entry(cursor: sqlite3.Cursor, parameters) -> None:
         """
         INSERT INTO comments_map
         (parent_id, uri) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?)
         ON CONFLICT(uri) DO UPDATE SET
-            parent_id = excluded.parent_id,
+            parent_id = excluded.parent_id
         """,
         parameters
     )

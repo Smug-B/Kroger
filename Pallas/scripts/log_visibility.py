@@ -2,7 +2,7 @@ import argparse
 import sqlite3
 
 
-from scripts.utils import ensure_working_directory, get_run_path, get_database, get_parent_id
+from utils import ensure_working_directory, get_database, get_parent_id
 
 
 def create_visibility_database(connection: sqlite3.Connection, cursor: sqlite3.Cursor) -> None:
@@ -10,8 +10,8 @@ def create_visibility_database(connection: sqlite3.Connection, cursor: sqlite3.C
                    CREATE TABLE IF NOT EXISTS visibility_map
                    (
                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                       encounter_id INTEGER,
-                       uri TEXT UNIQUE,
+                       encounter_id INTEGER UNIQUE,
+                       uri TEXT NOT NULL UNIQUE,
                        views INTEGER,
                        likes INTEGER,
                        reposts INTEGER,
@@ -26,13 +26,13 @@ def create_visibility_entry(cursor: sqlite3.Cursor, parameters) -> None:
         """
         INSERT INTO visibility_map
         (encounter_id, uri, views, likes, reposts, replies) 
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(uri) DO UPDATE SET
             encounter_id = excluded.encounter_id,
             views = excluded.views,
             likes = excluded.likes,
             reposts = excluded.reposts,
-            replies = excluded.replies,
+            replies = excluded.replies
         """,
         parameters
     )
@@ -77,7 +77,7 @@ def main():
 
     create_visibility_database(connection, cursor)
     parent_id: int = get_parent_id(cursor, uri)
-    create_visibility_entry(cursor, parameters=(parent_id, uri, views, likes, reposts, replies, run_name))
+    create_visibility_entry(cursor, parameters=(parent_id, uri, views, likes, reposts, replies))
     connection.commit()
     connection.close()
 

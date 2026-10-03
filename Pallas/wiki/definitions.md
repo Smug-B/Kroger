@@ -129,6 +129,7 @@ Whenever you are asked to provide a metric, you may be asked to justify your res
 | C | Corroborated secondary source |
 | D | Uncorroborated secondary source |
 | E | Speculation or opinion |
+| F | No evidence available |
 
 ## Post Visibility
 Post visibility -- sometimes shortened to "visibility," or abbreviated as PV -- is a metric determining how many people have seen a post and interacted with it, such that the post has left an impression on them.

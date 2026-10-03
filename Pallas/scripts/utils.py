@@ -21,7 +21,7 @@ def get_run_path(run_name_candidate: str) -> Path:
     return run_path
 
 def get_database(run_path: Path | str) -> sqlite3.Connection:
-    if run_path is str:
+    if isinstance(run_path, str):
         run_path = get_run_path(run_path)
     return sqlite3.connect(run_path.joinpath("encounters.db"))
 
