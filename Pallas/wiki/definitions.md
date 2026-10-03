@@ -1,7 +1,5 @@
 # Kroger
-The Kroger Company (sometimes referred to as just The Kroger Co. or just Kroger) is a major American supermarket chain with numerous subsidiaries and affiliates. Kroger trades under the ticker $KR, and thus is also commonly abbreviated as "KR". Because the Kroger Company shares the same name as its key subsidiary, it should be assumed that "Kroger" or "KR" refer to the parent company unless otherwise specified.
-
-The core mission of this project is an analysis of KR's performance, operations, and financial health in order to correctly predict the future direction of the company's stock price. Doing so allows the project to continue, and guarantees a steady stream of tokens.
+The Kroger Company (sometimes referred to as just The Kroger Co. or just Kroger) is a major American supermarket chain with numerous subsidiaries and affiliates. Kroger trades under the ticker $KR, and thus is also commonly abbreviated as "KR". Because the Kroger Company shares the same name as its key subsidiary, it should be assumed that "Kroger" or "KR" refer to the entire company operations unless otherwise specified.
 
 ## Subsidiaries and Affiliates
 - Kroger
@@ -40,7 +38,7 @@ The core mission of this project is an analysis of KR's performance, operations,
 - Kroger Logistics
 
 ## Competitors
-Analyzing Kroger's competitors is crucial to understanding the company's position in the market and its potential for growth. 
+Analyzing Kroger's competitors is crucial to understanding the company's position in the market and its potential for future growth or decline. 
 
 Competitors include, but are not limited to:
 - ALDI
@@ -57,7 +55,82 @@ Competitors include, but are not limited to:
 - Publix
 - Wegmans
 
-# Post Visibility
+# Web Extraction Guidelines
+1. **Never Simply Fetch:** Many websites do not allow for programmatic access to their content. Instead, you should use your Playwright tool to navigate to the post and extract the information you need.
+2. **Never Guess Metrics:** Requested metrics must be extracted via precise CSS selectors. If the selector fails, report the failure instead of estimating.
+3. **Prefer DOM Evaluation:** Use JavaScript execution (`page.evaluate`) to pull attributes (`href`, `data-score`) rather than parsing unstructured markdown text dumps.
+4. **Log-In Requests:** Certain sites restrict access to their content behind a login. If you encounter such a site, you should pause operations and request the user to provide login credentials. After the user has provided credentials, or logged-in on your behalf, you can continue work.
+5. **Handle Anti-Bot Stubs:** If a page returns an empty shell or a Cloudflare challenge, stop immediately and report that the page content could not be rendered, rather than hallucinating what the post *might* have said based on the URL.
+
+# Scripts
+Within `./Kroger/Pallas/scripts` there are several scripts that you may be requested to use. 
+
+A brief definition of each script is provided below:
+
+## log_encounter.py
+`log_encounter.py` takes the following arguments:
+- `uri`: URI leading to the post (REQUIRED)
+- `parent_uri`: If the post is a comment, uri leading to the parent post. If the post is a top-level post, uri leading to itself (REQUIRED)
+- `create_time`: Post's creation time in ISO-8601 format i.e. `YYYY-MM-DD HH:MM:SS` (REQUIRED)
+- `visibility`: Calculated post visibility (REQUIRED)
+- `source`: Inferred post source (REQUIRED)
+- `source_confidence`: Confidence of inferred post source (REQUIRED)
+- `content`: Pithy summary of post's content (REQUIRED)
+- `run_name`: Name of folder where the encounters database will be stored (optional)
+
+It should be noted that `run_name` is optional, but if not provided, the script will default to using the current date and time as the run name.
+This has the possibility of contaminating the encounters database with encounters from different runs, which is not ideal.
+Thus, you should always supply `run_name` as the date of your instantiation.
+
+This script logs "encounters" in a relational database powered by SQLite. An encounter is a post that has been discovered and briefly analyzed, providing the visibility metric as well as a source inference and a content summary.
+
+The database is stored under `./Kroger/Pallas/runs/[run_name]/encounters.db`, where [run_name] refers to the parameter passed to the script.
+
+`log_encounter.py` currently creates two tables in the database: `encounters_map` and `comments_map`.
+If `log_encounter.py` is called on a comment with a `parent_uri` that does not exist in the `encounters_map` table, it will create an entry for the parent post in the `encounters_map` table. However, this entry will only populate the `uri` and `id` columns. 
+
+### encounters_map
+Contains encounter data only for top level posts. `id` is the primary key, but `uri` is also a unique identifier for the post.
+
+Columns:
+- `id`: Auto-incrementing primary key
+- `uri`: Post uri and unique identifier
+- `create_time`: Post's creation time
+- `encounter_time`: Time the post was logged by calling `log_encounter.py`
+- `visibility`: Calculated post visibility
+- `source`: Inferred post source
+- `source_confidence`: Confidence of inferred post source
+- `content`: Pithy summary of post's content
+
+### comments_map
+Contains encounter data only for comments. Comments are linked to their parent post via the `parent_id` column, which references the `id` column in `encounters_map`.
+
+Columns:
+- `comment_id`: Auto-incrementing primary key
+- `parent_id`: ID of the parent post. References `id` in `encounters_map`
+- `uri`: Comment uri and unique identifier
+- `create_time`: Comment's creation time
+- `encounter_time`: Time the comment was logged by calling `log_encounter.py`
+- `visibility`: Calculated comment visibility
+- `source`: Inferred comment source
+- `source_confidence`: Confidence of inferred comment source
+- `content`: Pithy summary of comment's content
+
+# Metrics
+We define metrics to be used across post analysis.
+
+## Evidence Quality
+Whenever you are asked to provide a metric, you may be asked to justify your response with evidence. The quality of this evidence -- evidence quality, abbreviated as EQ -- is defined as follows:
+
+| EQ Grade | Description |
+| --- | --- |
+| A | Primary or direct evidence |
+| B | Credible first-hand source |
+| C | Corroborated secondary source |
+| D | Uncorroborated secondary source |
+| E | Speculation or opinion |
+
+## Post Visibility
 Post visibility -- sometimes shortened to "visibility," or abbreviated as PV -- is a metric determining how many people have seen a post and interacted with it, such that the post has left an impression on them.
 
 Determining PV varies based on the underlying social media platform as different metrics are exposed by different platforms. It's crucial to understand the platform's metrics when determining PV, as well as balancing the PV results from different platforms. For instance, a post with a high number of views on X (formerly Twitter) may not be as visible as a post with a high number of views on YouTube.
@@ -77,59 +150,74 @@ A shared documentation detailing how PV is calculated for each platform should b
 
 Before performing any analysis or determination of PV (or PPV), you should always check if the shared documentation has been updated to reflect any changes in the calculation method. If it has, you should update your analysis or determination of PV (or PPV) accordingly.
 
-# Post Source
-Post source -- sometimes shortened to "source," or abbreviated as PS -- is a inference of who authored the post. This is crucial for understanding the context of the post, as well as determining the post's credibility and potential impact on Kroger.
+## Post Source
+Post source -- sometimes shortened to "source," or abbreviated as PS -- is an inference of who authored the post. Sources should fall into the following bands:
 
-Due to the anonymous nature of social media, determining the source of a post can be challenging. However, it is important to make an educated guess based on the available information. Any request for a source should be appended with a source confidence, a percentage expressing how confident we are that our predicted source matches the ground truth. Source confidences should be given realistically, and be backed by evidence from the post. If we are unsure of the source, it is preferred that we explicitly state our uncertainty.
+| Source | Description |
+| --- | --- |
+| Manager | Someone who is responsible for managing a store, as well as someone who may be from Kroger's corporate office. |
+| Employee | Someone who works at a Kroger store, but is not a manager. |
+| Customer | Someone who could shop at a Kroger store, and is not an employee or manager.|
+| Media | Someone who is reporting on a Kroger store. |
+| Other | Someone who does not fit into any of the above categories. |
+| Unsure | Default option when you are unable to determine the source of the post. |
 
-It is extremely rare for your inferred source is given with 100% confidence. As it is nearly impossible to prove with absolute certainty who authored a post, if you arrive at a conclusion that is 100% confident, you should re-evaluate your reasoning and consider if there is any ambiguity or evidence that contradicts your conclusion.
+It is important that source inference is done so using evidence. 
+You should grade your inferences through referring to evidence quality as defined in the `Evidence Quality` section of this document.
+If multiple post sources are plausible, and evidence quality is similar (within one letter grade), you should explicitly state your uncertainty through the `Unsure` source option.
 
-Sources should be one of the following:
-- Manager
-- Employee
-- Customer
-- Competitor
-- Media
-- Other
-- Unsure
+## Business Relevance
+Business relevance -- sometimes shortened to "relevance," or abbreviated as BR -- is a numerical metric of how relevant the information contained within the post is to Kroger's business operations. 
 
-A manager encapsulates someone who is responsible for managing a store, as well as someone who may be from Kroger's corporate office. 
+| BR Score | Meaning |
+| --- | --- |
+| 5 | Highly relevant to Kroger's business operations |
+| 4 | Potentially highly material |
+| 3 | Potentially material |
+| 2 | Plausible operational relevance |
+| 1 | Weak or indirect relevance |
+| 0 | No plausible mechanism |
 
-Here is an example of how to format a source response whose format is otherwise unspecified: `Employee (70% Confidence)`.
+It is important that business relevance is graded using evidence quality as defined in the `Evidence Quality` section of this document.
 
-# Post Sentiment
-Post sentiment -- sometimes shortened to "sentiment" -- is a measure of how the post is presented to, or perceived by, the general public. This is a crucial metric for understanding the post's potential impact on Kroger.
+## Business Implications
+Business implications -- sometimes shortened to "implications," or abbreviated as BI -- is a numerical metric quantifying how the information contained within the post may impact Kroger's business operations. 
 
-Sentiment should be given as a numeric value where 1 reflects poorly on Kroger and may ultimately help indicate a negative impact on the company's stock price, whereas 10 reflects great on Kroger and may ultimately help indicate a positive impact on the company's stock price.
+| BI Score | Meaning |
+| --- | --- |
+| -2 | Highly negative impact on Kroger's business operations |
+| -1 | Moderately negative impact on Kroger's business operations |
+| 0 | Neutral impact on Kroger's business operations |
+| 1 | Moderately positive impact on Kroger's business operations |
+| 2 | Highly positive impact on Kroger's business operations |
 
-We must be careful to not be overly sensitive to sentiment, as a single post may not be enough to significantly impact the company's stock price. For instance, a post detailing a one-off complaint about a single employee's behavior is rather moot. While the tone of the post may be negative, it's ultimately unlikely to have a significant impact on the company's stock price and should be deemed neutral: 5. However, this changes if the post has a large PV, or PPV, as these metrics indicate the negative aspect of the post is resonant with Kroger's clientel. Thus post sentiment is highly contextual, and you may be asked to provide a justification for your sentiment rating.
+## Post Tone
+Post tone -- sometimes shortened to "tone" -- is a measure of how the post is presented to, or perceived by, the general public. Use the following bands:
 
-Sentiment may sometimes be requested in the form of a string. In these cases, the string outputted should be reflective of sentiment as follows:
-- If sentiment is 1 or 2, the string should be "very negative"
-- If sentiment is 3 or 4, the string should be "negative"
-- If sentiment is 5 or 6, the string should be "neutral"
-- If sentiment is 7 or 8, the string should be "positive"
-- If sentiment is 9 or 10, the string should be "very positive"
+| Tone Score | Meaning |
+| --- | --- |
+| -5 | Very negative |
+| -3 to -4 | Negative |
+| -1 to -2 | Slightly negative |
+| 0 | Neutral |
+| 1 - 2 | Slightly positive |
+| 3 - 4 | Positive |
+| 5 | Very positive |
 
-# Post Interestingness
-Post interestingness -- sometimes shortened to "interestingness," or abbreviated as PI -- is a measure of how interesting the post is to our analysis of KR's stock performance. Recall that we are aiming to correctly predict KR's stock performance, and thus we are aiming to get an informational edge over the market. Interesting posts are those that may provide such an edge.
+## Information Value
+Information value -- sometimes shortened to "information value," or abbreviated as IV -- is a numerical metric of how much potentially useful information the post adds to our understanding of Kroger's operations or competitive position, considering source quality, novelty, specificity, and potential business relevance. It determines whether the post is worth investigating further. Use the following bands:
 
-Interestingness should be given as a numeric value where 1 reflects a post that is not interesting to our analysis of KR's stock performance, whereas 10 reflects a post that is highly interesting to our analysis of KR's stock performance.
+| IV Score | Meaning |
+| --- | --- |
+| 7 - 10 | High possible information value. Definitely needs further investigation |
+| 4 - 6 | Medium information value. Could investigate if nothing else is queued. |
+| 1 - 3 | Low information value. Log and move on. |
 
-Interesting is highly contextual, and should be derived from PV, PS, and sentiment. For instance, a post with a managerial source that has negative sentiment but low PV is HIGHLY interesting, as it indicates a potential issue that may not be widely known. 
-
-# Web Extraction Guidelines
-1. **Never Simply Fetch:** Many websites do not allow for programmatic access to their content. Instead, you should use your Playwright tool to navigate to the post and extract the information you need.
-2. **Never Guess Metrics:** Requested metrics must be extracted via precise CSS selectors. If the selector fails, report the failure instead of estimating.
-3. **Prefer DOM Evaluation:** Use JavaScript execution (`page.evaluate`) to pull attributes (`href`, `data-score`) rather than parsing unstructured markdown text dumps.
-4. **Log-In Requests:** Certain sites restrict access to their content behind a login. If you encounter such a site, you should pause operations and request the user to provide login credentials. After the user has provided credentials, or logged-in on your behalf, you can continue work.
-5. **Handle Anti-Bot Stubs:** If a page returns an empty shell or a Cloudflare challenge, stop immediately and report that the page content could not be rendered, rather than hallucinating what the post *might* have said based on the URL.
-
-# Social Media Platforms
-## X
+## Social Media Platforms
+### X
 X (formerly Twitter) is a social media platform that allows users to post short messages, called "tweets," to a public feed. 
 
-### PV
+#### PV
 x.com provides four possible metrics to derive visibility. 
 Ranked in order of importance, they are as follows:
 Reply
@@ -155,10 +243,10 @@ visibility: 2k likes. 320 reposts. 50 replies. 200k views
 Here is an example of some x.com metrics that would correspond to a 2 in terms of
 visibility: 100 likes. 12 reposts. 3 replies. 3k views
 
-## Reddit
+### Reddit
 Reddit is a social media platform that allows users to post content, called "posts," to a public feed. 
 
-### PV
+#### PV
 reddit.com provides two core metrics to derive visibility: upvotes and comments.
 
 A good heuristic to utilize for reddit is:
